@@ -1,0 +1,25 @@
+<section>
+    <h2 class="h3 mb-3">Projects</h2>
+    <div class="row g-3">
+        @foreach (var project in Projects)
+        {
+            <div class="col-md-6">
+                <article class="card h-100 p-3">
+                    <h3 class="h5">@project.Title</h3>
+                    <p class="mb-0">@project.Description</p>
+                </article>
+            </div>
+        }
+    </div>
+</section>
+
+@code {
+    private readonly Project[] Projects =
+    [
+        new("Task Tracker", "A simple app for organizing tasks and deadlines."),
+        new("Weather Dashboard", "A dashboard showing current conditions and forecasts."),
+        new("Recipe Finder", "A searchable collection of favorite recipes.")
+    ];
+
+    private sealed record Project(string Title, string Description);
+}

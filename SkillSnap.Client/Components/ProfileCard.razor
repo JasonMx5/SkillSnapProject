@@ -1,0 +1,22 @@
+@using Microsoft.AspNetCore.Components
+
+<section class="card text-center p-4">
+    <img class="rounded-circle mx-auto mb-3"
+         src="@ProfileImageUrl"
+         alt="@($"{Name}'s profile picture")"
+         width="160"
+         height="160" />
+    <h2 class="h4">@Name</h2>
+    <p class="mb-0">@Bio</p>
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Name { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Bio { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string ProfileImageUrl { get; set; } = string.Empty;
+}
