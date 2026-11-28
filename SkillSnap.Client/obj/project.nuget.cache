@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "YZhIFKEbWlk=",
+  "dgSpecHash": "guQbHRNjIH4=",
   "success": true,
   "projectFilePath": "C:\\Users\\jason\\Documents\\GitHub\\SkillSnapProject\\SkillSnap.Client\\SkillSnap.Client.csproj",
   "expectedPackageFiles": [
@@ -25,6 +25,7 @@
     "C:\\Users\\jason\\.nuget\\packages\\microsoft.extensions.fileproviders.abstractions\\10.0.15\\microsoft.extensions.fileproviders.abstractions.10.0.15.nupkg.sha512",
     "C:\\Users\\jason\\.nuget\\packages\\microsoft.extensions.fileproviders.physical\\10.0.15\\microsoft.extensions.fileproviders.physical.10.0.15.nupkg.sha512",
     "C:\\Users\\jason\\.nuget\\packages\\microsoft.extensions.filesystemglobbing\\10.0.15\\microsoft.extensions.filesystemglobbing.10.0.15.nupkg.sha512",
+    "C:\\Users\\jason\\.nuget\\packages\\microsoft.extensions.http\\10.0.15\\microsoft.extensions.http.10.0.15.nupkg.sha512",
     "C:\\Users\\jason\\.nuget\\packages\\microsoft.extensions.logging\\10.0.15\\microsoft.extensions.logging.10.0.15.nupkg.sha512",
     "C:\\Users\\jason\\.nuget\\packages\\microsoft.extensions.logging.abstractions\\10.0.15\\microsoft.extensions.logging.abstractions.10.0.15.nupkg.sha512",
     "C:\\Users\\jason\\.nuget\\packages\\microsoft.extensions.options\\10.0.15\\microsoft.extensions.options.10.0.15.nupkg.sha512",

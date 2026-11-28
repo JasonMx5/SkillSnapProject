@@ -1,0 +1,43 @@
+@page "/projects"
+@using SkillSnap.Client.Components
+@using SkillSnap.Client.Services
+@inject AuthService AuthService
+@inject UserSessionService UserSessionService
+
+<PageTitle>Projects</PageTitle>
+
+<header class="page-heading">
+    <span class="page-heading-icon"><AppIcon Name="folder" Size="24" /></span>
+    <div>
+        <span class="eyebrow">Admin workspace</span>
+        <h1>Project management</h1>
+        <p>Create, update, and organize the opportunities available to the community.</p>
+    </div>
+</header>
+
+@if (!isInitialized)
+{
+    <div class="loading-panel"><span class="loading-dot"></span> Loading project management...</div>
+}
+else if (UserSessionService.Role != "Admin")
+{
+    <div class="empty-state">
+        <span class="feature-icon"><AppIcon Name="user" Size="22" /></span>
+        <h2>Admin access required</h2>
+        <p>An Admin account is required to manage projects.</p>
+    </div>
+}
+else
+{
+    <ProjectList />
+}
+
+@code {
+    private bool isInitialized;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await AuthService.InitializeAsync();
+        isInitialized = true;
+    }
+}

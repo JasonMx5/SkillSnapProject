@@ -1,0 +1,491 @@
+@page "/projects/{ProjectId:int}"
+@using SkillSnap.Client.Services
+@using SkillSnap.Shared.Models
+@using System.Text.Json
+@inject AuthService AuthService
+@inject ProjectService ProjectService
+@inject UserSessionService UserSessionService
+
+<PageTitle>@(project?.Title ?? "Project Details")</PageTitle>
+
+<NavLink class="page-tab mb-3" href="/project-listing">
+    <span class="icon-back"><AppIcon Name="arrow" Size="17" /></span>
+    Back to projects
+</NavLink>
+
+@if (isLoading)
+{
+    <p>Loading project...</p>
+}
+else if (errorMessage is not null)
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+else if (project is not null)
+{
+    @if (noticeMessage is not null)
+    {
+        <div class="alert alert-warning" role="status">@noticeMessage</div>
+    }
+
+    <article class="project-detail">
+        <header class="page-heading">
+            <span class="page-heading-icon"><AppIcon Name="folder" Size="24" /></span>
+            <div>
+                <span class="eyebrow">Project details</span>
+                <h1>@project.Title</h1>
+                <p>Explore the project and meet the portfolio owner.</p>
+            </div>
+        </header>
+        @if (ProjectService.GetImageSource(project.ImageUrl) is { } imageSource)
+        {
+            <img src="@imageSource" class="img-fluid rounded-4 mb-4 detail-hero-image" alt="@project.Title" />
+        }
+        <p class="lead">@project.Description</p>
+
+        <div class="mb-4">
+            @if (!AuthService.IsAuthenticated)
+            {
+                <a class="btn btn-primary d-inline-flex align-items-center gap-2" href="/login">
+                    <AppIcon Name="login" Size="17" />
+                    Log in to enroll
+                </a>
+            }
+            else if (myEnrollmentStatus is { } status)
+            {
+                <span class="badge @GetStatusClass(status) me-2">@GetStatusLabel(status)</span>
+                <button type="button"
+                        class="btn btn-outline-danger d-inline-flex align-items-center gap-2"
+                        @onclick="Unenroll"
+                        disabled="@isUpdatingEnrollment">
+                    <AppIcon Name="close" Size="17" />
+                    @(isUpdatingEnrollment ? "Updating..." : "Unenroll")
+                </button>
+            }
+            else
+            {
+                <button type="button"
+                        class="btn btn-primary d-inline-flex align-items-center gap-2"
+                        @onclick="Enroll"
+                        disabled="@isUpdatingEnrollment">
+                    <AppIcon Name="plus" Size="17" />
+                    @(isUpdatingEnrollment ? "Enrolling..." : "Enroll")
+                </button>
+            }
+        </div>
+
+        @if (actionError is not null)
+        {
+            <div class="alert alert-danger" role="alert">@actionError</div>
+        }
+
+        @if (project.Owner is not null)
+        {
+            <section class="card owner-card p-4 mb-4">
+                <h2 class="h4">Project owner</h2>
+                <div class="d-flex align-items-start gap-3">
+                    @if (ProjectService.GetImageSource(project.Owner.ProfileImageUrl) is { } ownerImageSource)
+                    {
+                        <img src="@ownerImageSource"
+                             alt="@project.Owner.Name"
+                             class="rounded-circle"
+                             style="width: 5rem; height: 5rem; object-fit: cover" />
+                    }
+                    <div>
+                        <h3 class="h5">@project.Owner.Name</h3>
+                        <p class="mb-0">@project.Owner.Bio</p>
+                    </div>
+                </div>
+            </section>
+        }
+
+        <section class="mb-4">
+            <h2 class="h4">Portfolio owner's skills</h2>
+            @if (project.OwnerSkills.Count == 0)
+            {
+                <p>No skills have been added to the owner's profile.</p>
+            }
+            else
+            {
+                <ul class="list-inline">
+                    @foreach (var skill in project.OwnerSkills)
+                    {
+                        <li class="list-inline-item mb-2">
+                            <span class="badge rounded-pill bg-primary">@skill.Name</span>
+                            <span class="badge rounded-pill bg-secondary">@skill.Level</span>
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+    </article>
+
+    @if (isAdmin)
+    {
+        <section class="card p-3">
+            <h2 class="h4">Manage enrollments</h2>
+            @if (adminError is not null)
+            {
+                <div class="alert alert-danger" role="alert">@adminError</div>
+            }
+            @if (isLoadingAdminEnrollments)
+            {
+                <p>Loading enrollment requests...</p>
+            }
+            else if (projectEnrollments.Count == 0)
+            {
+                <p>No users have enrolled in this project.</p>
+            }
+            else
+            {
+                <div class="list-group">
+                    @foreach (var enrollment in projectEnrollments)
+                    {
+                        <div class="list-group-item d-flex justify-content-between align-items-center gap-3">
+                            <div>
+                                <span class="me-2">@enrollment.Email</span>
+                                <span class="badge @GetStatusClass(enrollment.Status)">@GetStatusLabel(enrollment.Status)</span>
+                            </div>
+                            @if (enrollment.Status == ProjectEnrollmentStatus.Pending)
+                            {
+                                <button type="button"
+                                        class="btn btn-sm btn-success"
+                                        @onclick="() => UpdateEnrollmentStatus(enrollment, ProjectEnrollmentStatus.Active)"
+                                        disabled="@isUpdatingEnrollment">
+                                    @(updatingUserId == enrollment.UserId ? "Approving..." : "Approve")
+                                </button>
+                            }
+                            else if (enrollment.Status == ProjectEnrollmentStatus.Active)
+                            {
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-secondary"
+                                        @onclick="() => UpdateEnrollmentStatus(enrollment, ProjectEnrollmentStatus.Completed)"
+                                        disabled="@isUpdatingEnrollment">
+                                    @(updatingUserId == enrollment.UserId ? "Updating..." : "Mark completed")
+                                </button>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+    }
+}
+
+@code {
+    [Parameter]
+    public int ProjectId { get; set; }
+
+    private ProjectDetailsResponse? project;
+    private List<ProjectEnrollmentAdminSummary> projectEnrollments = [];
+    private ProjectEnrollmentStatus? myEnrollmentStatus;
+    private string? errorMessage;
+    private string? noticeMessage;
+    private string? actionError;
+    private string? adminError;
+    private string? updatingUserId;
+    private bool isLoading = true;
+    private bool isLoadingAdminEnrollments;
+    private bool isUpdatingEnrollment;
+
+    private bool isAdmin => AuthService.IsAuthenticated && UserSessionService.Role == "Admin";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await AuthService.InitializeAsync();
+        await LoadProject();
+    }
+
+    private async Task LoadProject()
+    {
+        isLoading = true;
+        errorMessage = null;
+        noticeMessage = null;
+        actionError = null;
+        project = null;
+        myEnrollmentStatus = null;
+        projectEnrollments = [];
+
+        try
+        {
+            project = await ProjectService.GetProjectDetailsAsync(ProjectId);
+        }
+        catch (HttpRequestException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            errorMessage = "This project could not be found.";
+            isLoading = false;
+            return;
+        }
+        catch (HttpRequestException exception)
+        {
+            errorMessage = GetRequestError("load this project", exception);
+            isLoading = false;
+            return;
+        }
+        catch (InvalidOperationException)
+        {
+            errorMessage = "The API returned an empty project response.";
+            isLoading = false;
+            return;
+        }
+        catch (JsonException)
+        {
+            errorMessage = "The API returned invalid project data.";
+            isLoading = false;
+            return;
+        }
+        catch (OperationCanceledException)
+        {
+            errorMessage = "Loading the project timed out. Please try again.";
+            isLoading = false;
+            return;
+        }
+
+        if (AuthService.IsAuthenticated)
+        {
+            try
+            {
+                myEnrollmentStatus = (await ProjectService.GetMyEnrollmentsAsync())
+                    .FirstOrDefault(enrollment => enrollment.ProjectId == ProjectId)?.Status;
+            }
+            catch (HttpRequestException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                await AuthService.LogoutAsync();
+                noticeMessage = "Your session is no longer valid. Log in again to enroll.";
+            }
+            catch (HttpRequestException exception)
+            {
+                noticeMessage = GetRequestError("load your enrollment status", exception);
+            }
+            catch (InvalidOperationException)
+            {
+                noticeMessage = "Could not load your enrollment status.";
+            }
+            catch (JsonException)
+            {
+                noticeMessage = "The API returned invalid enrollment data.";
+            }
+            catch (OperationCanceledException)
+            {
+                noticeMessage = "Loading your enrollment status timed out.";
+            }
+
+            if (isAdmin)
+            {
+                await LoadProjectEnrollments();
+            }
+        }
+
+        isLoading = false;
+    }
+
+    private async Task LoadProjectEnrollments()
+    {
+        isLoadingAdminEnrollments = true;
+        adminError = null;
+
+        try
+        {
+            projectEnrollments = await ProjectService.GetProjectEnrollmentsAsync(ProjectId);
+        }
+        catch (HttpRequestException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            await AuthService.LogoutAsync();
+            noticeMessage = "Your session is no longer valid. Log in again to manage enrollments.";
+        }
+        catch (HttpRequestException exception)
+        {
+            adminError = GetRequestError("load project enrollments", exception);
+        }
+        catch (InvalidOperationException)
+        {
+            adminError = "The API returned an empty project enrollment response.";
+        }
+        catch (JsonException)
+        {
+            adminError = "The API returned invalid project enrollment data.";
+        }
+        catch (OperationCanceledException)
+        {
+            adminError = "Loading project enrollments timed out.";
+        }
+        finally
+        {
+            isLoadingAdminEnrollments = false;
+        }
+    }
+
+    private async Task Enroll()
+    {
+        actionError = null;
+        isUpdatingEnrollment = true;
+
+        try
+        {
+            await ProjectService.EnrollInProjectAsync(ProjectId);
+            myEnrollmentStatus = ProjectEnrollmentStatus.Pending;
+
+            if (isAdmin)
+            {
+                await LoadProjectEnrollments();
+            }
+        }
+        catch (HttpRequestException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            if (await RefreshMyEnrollmentStatus())
+            {
+                actionError = "You are already enrolled in this project.";
+            }
+        }
+        catch (HttpRequestException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            await AuthService.LogoutAsync();
+            noticeMessage = "Your session is no longer valid. Log in again to enroll.";
+        }
+        catch (HttpRequestException exception)
+        {
+            actionError = GetRequestError("enroll in this project", exception);
+        }
+        catch (OperationCanceledException)
+        {
+            actionError = "Enrollment timed out. Please try again.";
+        }
+        finally
+        {
+            isUpdatingEnrollment = false;
+        }
+    }
+
+    private async Task Unenroll()
+    {
+        actionError = null;
+        isUpdatingEnrollment = true;
+
+        try
+        {
+            await ProjectService.UnenrollFromProjectAsync(ProjectId);
+            myEnrollmentStatus = null;
+
+            if (isAdmin)
+            {
+                await LoadProjectEnrollments();
+            }
+        }
+        catch (HttpRequestException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            await AuthService.LogoutAsync();
+            noticeMessage = "Your session is no longer valid. Log in again to manage enrollments.";
+        }
+        catch (HttpRequestException exception)
+        {
+            actionError = GetRequestError("unenroll from this project", exception);
+        }
+        catch (OperationCanceledException)
+        {
+            actionError = "Unenrollment timed out. Please try again.";
+        }
+        finally
+        {
+            isUpdatingEnrollment = false;
+        }
+    }
+
+    private async Task<bool> RefreshMyEnrollmentStatus()
+    {
+        try
+        {
+            var enrollment = (await ProjectService.GetMyEnrollmentsAsync())
+                .FirstOrDefault(item => item.ProjectId == ProjectId);
+            myEnrollmentStatus = enrollment?.Status;
+            return true;
+        }
+        catch (HttpRequestException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            await AuthService.LogoutAsync();
+            noticeMessage = "Your session is no longer valid. Log in again to enroll.";
+        }
+        catch (HttpRequestException exception)
+        {
+            actionError = GetRequestError("refresh your enrollment status", exception);
+        }
+        catch (InvalidOperationException)
+        {
+            actionError = "The API returned an empty enrollment response.";
+        }
+        catch (JsonException)
+        {
+            actionError = "The API returned invalid enrollment data.";
+        }
+        catch (OperationCanceledException)
+        {
+            actionError = "Refreshing your enrollment status timed out.";
+        }
+
+        return false;
+    }
+
+    private async Task UpdateEnrollmentStatus(
+        ProjectEnrollmentAdminSummary enrollment,
+        ProjectEnrollmentStatus newStatus)
+    {
+        adminError = null;
+        updatingUserId = enrollment.UserId;
+        isUpdatingEnrollment = true;
+
+        try
+        {
+            await ProjectService.UpdateProjectEnrollmentStatusAsync(ProjectId, enrollment.UserId, newStatus);
+            var index = projectEnrollments.FindIndex(item => item.UserId == enrollment.UserId);
+            if (index >= 0)
+            {
+                projectEnrollments[index] = enrollment with { Status = newStatus };
+            }
+
+            if (UserSessionService.UserId == enrollment.UserId)
+            {
+                myEnrollmentStatus = newStatus;
+            }
+        }
+        catch (HttpRequestException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            await AuthService.LogoutAsync();
+            noticeMessage = "Your session is no longer valid. Log in again to manage enrollments.";
+        }
+        catch (HttpRequestException exception)
+        {
+            adminError = GetRequestError("update enrollment status", exception);
+        }
+        catch (OperationCanceledException)
+        {
+            adminError = "Updating enrollment status timed out.";
+        }
+        finally
+        {
+            isUpdatingEnrollment = false;
+            updatingUserId = null;
+        }
+    }
+
+    private static string GetStatusLabel(ProjectEnrollmentStatus status)
+    {
+        return status == ProjectEnrollmentStatus.Pending ? "Pending approval" : status.ToString();
+    }
+
+    private static string GetStatusClass(ProjectEnrollmentStatus status)
+    {
+        return status switch
+        {
+            ProjectEnrollmentStatus.Pending => "bg-warning text-dark",
+            ProjectEnrollmentStatus.Active => "bg-success",
+            ProjectEnrollmentStatus.Completed => "bg-secondary",
+            _ => "bg-secondary"
+        };
+    }
+
+    private static string GetRequestError(string action, HttpRequestException exception)
+    {
+        return exception.StatusCode is { } statusCode
+            ? $"Could not {action}. The API returned {(int)statusCode} ({statusCode})."
+            : $"Could not {action}. Check the API connection and try again.";
+    }
+}

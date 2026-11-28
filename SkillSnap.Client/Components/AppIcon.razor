@@ -1,0 +1,79 @@
+<svg class="@CssClass"
+     width="@Size"
+     height="@Size"
+     viewBox="0 0 24 24"
+     fill="none"
+     stroke="currentColor"
+     stroke-width="1.8"
+     stroke-linecap="round"
+     stroke-linejoin="round"
+     aria-hidden="true"
+     focusable="false">
+    @switch (Name)
+    {
+        case "home":
+            <path d="m3 10 9-7 9 7" />
+            <path d="M5 9v11h14V9M9 20v-6h6v6" />
+            break;
+        case "compass":
+            <circle cx="12" cy="12" r="9" />
+            <path d="m15.5 8.5-2.2 4.8-4.8 2.2 2.2-4.8 4.8-2.2Z" />
+            break;
+        case "folder":
+            <path d="M3 6.5h7l2 2h9v10H3z" />
+            <path d="M3 9h18" />
+            break;
+        case "skills":
+            <path d="m12 3 1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z" />
+            <path d="m19 15 .9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15Z" />
+            break;
+        case "bell":
+            <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+            <path d="M10 21h4" />
+            break;
+        case "user":
+            <circle cx="12" cy="8" r="3.5" />
+            <path d="M5 21a7 7 0 0 1 14 0" />
+            break;
+        case "login":
+            <path d="M14 4h5a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-5" />
+            <path d="m10 17 5-5-5-5M15 12H3" />
+            break;
+        case "logout":
+            <path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5" />
+            <path d="m14 17-5-5 5-5M9 12h12" />
+            break;
+        case "menu":
+            <path d="M4 6h16M4 12h16M4 18h16" />
+            break;
+        case "close":
+            <path d="m6 6 12 12M18 6 6 18" />
+            break;
+        case "arrow":
+            <path d="M5 12h14M13 6l6 6-6 6" />
+            break;
+        case "plus":
+            <path d="M12 5v14M5 12h14" />
+            break;
+        case "edit":
+            <path d="m15 5 4 4M4 20l4.3-.9L19 8.4 15.6 5 4.9 15.7 4 20Z" />
+            break;
+        case "trash":
+            <path d="M4 7h16M10 11v6M14 11v6M5 7l1 14h12l1-14M9 7V4h6v3" />
+            break;
+        case "check":
+            <path d="m5 12 4 4L19 6" />
+            break;
+    }
+</svg>
+
+@code {
+    [Parameter]
+    public string Name { get; set; } = string.Empty;
+
+    [Parameter]
+    public int Size { get; set; } = 20;
+
+    [Parameter]
+    public string? CssClass { get; set; }
+}

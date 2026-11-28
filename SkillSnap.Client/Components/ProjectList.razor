@@ -1,25 +1,402 @@
+@using SkillSnap.Client.Services
+@using SkillSnap.Shared.Models
+@using System.Text.Json
+@inject ProjectService ProjectService
+@inject UserSessionService UserSessionService
+@inject IJSRuntime JS
+@implements IDisposable
+
 <section>
-    <h2 class="h3 mb-3">Projects</h2>
-    <div class="row g-3">
-        @foreach (var project in Projects)
-        {
-            <div class="col-md-6">
-                <article class="card h-100 p-3">
-                    <h3 class="h5">@project.Title</h3>
-                    <p class="mb-0">@project.Description</p>
-                </article>
-            </div>
-        }
+    <div class="section-heading">
+        <div>
+            <h2>Projects</h2>
+            <p class="mb-0 text-muted">Manage the projects shown in the public listing.</p>
+        </div>
+        <span class="feature-icon mb-0"><AppIcon Name="folder" Size="21" /></span>
     </div>
+    <EditForm Model="@NewProject" OnValidSubmit="AddProject" class="card form-panel p-4 mb-4">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="mb-3">
+            <label for="project-title" class="form-label">Title</label>
+            <InputText id="project-title" class="form-control" @bind-Value="NewProject.Title" />
+            <ValidationMessage For="@(() => NewProject.Title)" />
+        </div>
+        <div class="mb-3">
+            <label for="project-description" class="form-label">Description</label>
+            <InputTextArea id="project-description" class="form-control" @bind-Value="NewProject.Description" />
+            <ValidationMessage For="@(() => NewProject.Description)" />
+        </div>
+        <div class="mb-3">
+            <label for="project-image" class="form-label">Project image (PNG, JPEG, or WebP; up to 5 MB)</label>
+            <InputFile id="project-image"
+                       accept="image/png,image/jpeg,image/webp"
+                       OnChange="UploadNewProjectImage"
+                       disabled="@isUploadingImage" />
+            @if (ProjectService.GetImageSource(NewProject.ImageUrl) is { } newImageSource)
+            {
+                <img src="@newImageSource"
+                     alt="Project image preview"
+                     class="img-thumbnail project-preview mt-2" />
+            }
+            <ValidationMessage For="@(() => NewProject.ImageUrl)" />
+        </div>
+        <div class="mb-3">
+            <label for="portfolio-user-id" class="form-label">Portfolio user ID</label>
+            <InputNumber id="portfolio-user-id" class="form-control" @bind-Value="NewProject.PortfolioUserId" />
+            <ValidationMessage For="@(() => NewProject.PortfolioUserId)" />
+        </div>
+        <button type="submit" class="btn btn-primary d-inline-flex align-items-center gap-2 align-self-start" disabled="@(isSaving || isUploadingImage)">
+            <AppIcon Name="plus" Size="17" />
+            @(isSaving ? "Adding..." : "Add project")
+        </button>
+    </EditForm>
+
+    @if (imageUploadError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@imageUploadError</div>
+    }
+    @if (saveError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@saveError</div>
+    }
+    @if (loadError is not null)
+    {
+        <div class="alert alert-danger" role="alert">
+            <p class="mb-2">@loadError</p>
+            <button type="button" class="btn btn-outline-danger" @onclick="LoadProjects">Retry</button>
+        </div>
+    }
+    @if (refreshError is not null)
+    {
+        <div class="alert alert-warning" role="alert">
+            <p class="mb-2">@refreshError</p>
+            <button type="button" class="btn btn-outline-warning" @onclick="RetryRefreshProjects">Retry refresh</button>
+        </div>
+    }
+
+    @if (isLoading)
+    {
+        <p>Loading projects...</p>
+    }
+    else if (projects.Count == 0)
+    {
+        <p>No projects found.</p>
+    }
+    else
+    {
+        <div class="row g-3">
+            @foreach (var project in projects)
+            {
+                <div class="col-md-6">
+                    <article class="card managed-item h-100 p-4">
+                        @if (editingProjectId == project.Id)
+                        {
+                            <EditForm Model="@editingProject" OnValidSubmit="SaveEdit">
+                                <DataAnnotationsValidator />
+                                <ValidationSummary />
+                                <div class="mb-3">
+                                    <label for="edit-project-title" class="form-label">Title</label>
+                                    <InputText id="edit-project-title" class="form-control" @bind-Value="editingProject.Title" />
+                                    <ValidationMessage For="@(() => editingProject.Title)" />
+                                </div>
+                                <div class="mb-3">
+                                    <label for="edit-project-description" class="form-label">Description</label>
+                                    <InputTextArea id="edit-project-description" class="form-control" @bind-Value="editingProject.Description" />
+                                    <ValidationMessage For="@(() => editingProject.Description)" />
+                                </div>
+                                <div class="mb-3">
+                                    <label for="edit-project-image" class="form-label">Replace image (PNG, JPEG, or WebP; up to 5 MB)</label>
+                                    <InputFile id="edit-project-image"
+                                               accept="image/png,image/jpeg,image/webp"
+                                               OnChange="UploadEditProjectImage"
+                                               disabled="@isUploadingImage" />
+                                    @if (ProjectService.GetImageSource(editingProject.ImageUrl) is { } editImageSource)
+                                    {
+                                        <img src="@editImageSource"
+                                             alt="Project image preview"
+                                             class="img-thumbnail project-preview mt-2" />
+                                    }
+                                    <ValidationMessage For="@(() => editingProject.ImageUrl)" />
+                                </div>
+                                <div class="mb-3">
+                                    <label for="edit-portfolio-user-id" class="form-label">Portfolio user ID</label>
+                                    <InputNumber id="edit-portfolio-user-id" class="form-control" @bind-Value="editingProject.PortfolioUserId" />
+                                    <ValidationMessage For="@(() => editingProject.PortfolioUserId)" />
+                                </div>
+                                <button type="submit" class="btn btn-primary d-inline-flex align-items-center gap-2 me-2" disabled="@isSaving">
+                                    <AppIcon Name="check" Size="16" />
+                                    @(isSaving ? "Saving..." : "Save")
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary d-inline-flex align-items-center gap-2" @onclick="CancelEdit" disabled="@isSaving">
+                                    <AppIcon Name="close" Size="16" />
+                                    Cancel
+                                </button>
+                            </EditForm>
+                        }
+                        else
+                        {
+                            <h3 class="h5">@project.Title</h3>
+                            <p>@project.Description</p>
+                            <div class="mt-auto">
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-2 me-2"
+                                        @onclick="() => BeginEdit(project)"
+                                        disabled="@isSaving">
+                                    <AppIcon Name="edit" Size="15" />
+                                    Edit
+                                </button>
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-2"
+                                        @onclick="() => DeleteProject(project)"
+                                        disabled="@isSaving">
+                                    <AppIcon Name="trash" Size="15" />
+                                    Delete
+                                </button>
+                            </div>
+                        }
+                    </article>
+                </div>
+            }
+        </div>
+    }
 </section>
 
 @code {
-    private readonly Project[] Projects =
-    [
-        new("Task Tracker", "A simple app for organizing tasks and deadlines."),
-        new("Weather Dashboard", "A dashboard showing current conditions and forecasts."),
-        new("Recipe Finder", "A searchable collection of favorite recipes.")
-    ];
+    private List<Project> projects = [];
+    private Project editingProject = new();
+    private int? editingProjectId;
+    private string? loadError;
+    private string? saveError;
+    private string? refreshError;
+    private bool isLoading = true;
+    private bool isSaving;
+    private bool isUploadingImage;
+    private string? imageUploadError;
 
-    private sealed record Project(string Title, string Description);
+    protected override async Task OnInitializedAsync()
+    {
+        UserSessionService.StateChanged += HandleSessionChanged;
+        await LoadProjects();
+    }
+
+    private async Task AddProject()
+    {
+        await SaveChange(async () =>
+        {
+            await ProjectService.AddProjectAsync(NewProject);
+            UserSessionService.CurrentProject = new() { PortfolioUserId = 1 };
+        }, "add the project", "Project was added");
+    }
+
+    private Project NewProject
+    {
+        get
+        {
+            if (UserSessionService.CurrentProject is { } currentProject)
+            {
+                return currentProject;
+            }
+
+            currentProject = new() { PortfolioUserId = 1 };
+            UserSessionService.CurrentProject = currentProject;
+            return currentProject;
+        }
+    }
+
+    private void HandleSessionChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void BeginEdit(Project project)
+    {
+        editingProjectId = project.Id;
+        editingProject = new Project
+        {
+            Id = project.Id,
+            Title = project.Title,
+            Description = project.Description,
+            ImageUrl = project.ImageUrl,
+            PortfolioUserId = project.PortfolioUserId
+        };
+        saveError = null;
+    }
+
+    private async Task SaveEdit()
+    {
+        if (editingProjectId is not int)
+        {
+            return;
+        }
+
+        await SaveChange(async () =>
+        {
+            await ProjectService.UpdateProjectAsync(editingProject);
+            editingProjectId = null;
+        }, "update the project", "Project was updated");
+    }
+
+    private void CancelEdit()
+    {
+        editingProjectId = null;
+        saveError = null;
+    }
+
+    private Task UploadNewProjectImage(InputFileChangeEventArgs args)
+    {
+        return UploadProjectImage(args.File, imageUrl => NewProject.ImageUrl = imageUrl);
+    }
+
+    private Task UploadEditProjectImage(InputFileChangeEventArgs args)
+    {
+        return UploadProjectImage(args.File, imageUrl => editingProject.ImageUrl = imageUrl);
+    }
+
+    private async Task UploadProjectImage(IBrowserFile file, Action<string> setImageUrl)
+    {
+        imageUploadError = null;
+        saveError = null;
+        isUploadingImage = true;
+
+        try
+        {
+            setImageUrl(await ProjectService.UploadProjectImageAsync(file));
+        }
+        catch (HttpRequestException exception)
+        {
+            imageUploadError = GetRequestError("upload the image", exception);
+        }
+        catch (InvalidOperationException exception)
+        {
+            imageUploadError = exception.Message;
+        }
+        catch (IOException)
+        {
+            imageUploadError = "Could not read the selected image. Please choose it again.";
+        }
+        catch (OperationCanceledException)
+        {
+            imageUploadError = "Image upload timed out. Please try again.";
+        }
+        finally
+        {
+            isUploadingImage = false;
+        }
+    }
+
+    private async Task DeleteProject(Project project)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", $"Delete the project '{project.Title}'?"))
+        {
+            return;
+        }
+
+        await SaveChange(async () =>
+        {
+            await ProjectService.DeleteProjectAsync(project.Id);
+            if (editingProjectId == project.Id)
+            {
+                editingProjectId = null;
+            }
+        }, "delete the project", "Project was deleted");
+    }
+
+    private async Task LoadProjects()
+    {
+        isLoading = true;
+        loadError = null;
+
+        try
+        {
+            projects = await ProjectService.GetProjectsAsync();
+        }
+        catch (HttpRequestException exception)
+        {
+            loadError = GetRequestError("load projects", exception);
+        }
+        catch (JsonException)
+        {
+            loadError = "The API returned invalid project data.";
+        }
+        catch (InvalidOperationException)
+        {
+            loadError = "The API returned an empty project response.";
+        }
+        catch (OperationCanceledException)
+        {
+            loadError = "Loading projects timed out. Please try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveChange(Func<Task> save, string action, string successMessage)
+    {
+        saveError = null;
+        refreshError = null;
+        isSaving = true;
+
+        try
+        {
+            await save();
+            await RefreshProjects(successMessage);
+        }
+        catch (HttpRequestException exception)
+        {
+            saveError = GetRequestError(action, exception);
+        }
+        catch (OperationCanceledException)
+        {
+            saveError = $"Could not {action}; the request timed out.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task RefreshProjects(string successMessage)
+    {
+        try
+        {
+            projects = await ProjectService.GetProjectsAsync();
+        }
+        catch (HttpRequestException exception)
+        {
+            refreshError = $"{successMessage}, but {GetRequestError("refresh the list", exception)}";
+        }
+        catch (JsonException)
+        {
+            refreshError = $"{successMessage}, but the API returned invalid project data.";
+        }
+        catch (InvalidOperationException)
+        {
+            refreshError = $"{successMessage}, but the API returned an empty project response.";
+        }
+        catch (OperationCanceledException)
+        {
+            refreshError = $"{successMessage}, but refreshing the list timed out.";
+        }
+    }
+
+    private Task RetryRefreshProjects()
+    {
+        return RefreshProjects("The project change was saved");
+    }
+
+    private static string GetRequestError(string action, HttpRequestException exception)
+    {
+        return exception.StatusCode is { } statusCode
+            ? $"Could not {action}. The API returned {(int)statusCode} ({statusCode})."
+            : $"Could not {action}. Check the connection and try again.";
+    }
+
+    public void Dispose()
+    {
+        UserSessionService.StateChanged -= HandleSessionChanged;
+    }
 }

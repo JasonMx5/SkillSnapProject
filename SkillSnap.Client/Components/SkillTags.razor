@@ -1,13 +1,261 @@
+@using SkillSnap.Client.Services
+@using SkillSnap.Shared.Models
+@using System.ComponentModel.DataAnnotations
+@inject SkillService SkillService
+@inject IJSRuntime JS
+
 <section>
-    <h2 class="h3 mb-3">Skills</h2>
-    <ul class="list-unstyled d-flex flex-wrap gap-2 mb-0">
-        @foreach (var skill in Skills)
-        {
-            <li><span class="badge rounded-pill bg-primary">@skill</span></li>
-        }
-    </ul>
+    <div class="section-heading">
+        <div>
+            <h2>Skills</h2>
+            <p class="mb-0 text-muted">Keep the portfolio skill catalog clear and current.</p>
+        </div>
+        <span class="feature-icon mb-0"><AppIcon Name="skills" Size="21" /></span>
+    </div>
+
+    <EditForm Model="@newSkill" OnValidSubmit="AddSkill" class="card form-panel p-4 mb-4">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <div class="mb-3">
+            <label for="new-skill-name" class="form-label">Name</label>
+            <InputText id="new-skill-name" class="form-control" @bind-Value="newSkill.Name" />
+            <ValidationMessage For="@(() => newSkill.Name)" />
+        </div>
+        <div class="mb-3">
+            <label for="new-skill-level" class="form-label">Level</label>
+            <InputText id="new-skill-level" class="form-control" @bind-Value="newSkill.Level" />
+            <ValidationMessage For="@(() => newSkill.Level)" />
+        </div>
+        <button type="submit" class="btn btn-primary d-inline-flex align-items-center gap-2 align-self-start" disabled="@isSaving">
+            <AppIcon Name="plus" Size="17" />
+            Add skill
+        </button>
+    </EditForm>
+
+    @if (errorMessage is not null)
+    {
+        <div class="alert alert-danger" role="alert">@errorMessage</div>
+    }
+
+    @if (isLoading)
+    {
+        <p>Loading skills...</p>
+    }
+    else if (skills.Count == 0)
+    {
+        <p>No skills found.</p>
+    }
+    else
+    {
+        <div class="list-group">
+            @foreach (var skill in skills)
+            {
+                <div class="list-group-item managed-item">
+                    @if (editingSkillId == skill.Id)
+                    {
+                        <EditForm Model="@editSkill" OnValidSubmit="SaveEdit">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary />
+                            <div class="mb-3">
+                                <label class="form-label">Name</label>
+                                <InputText class="form-control" @bind-Value="editSkill.Name" />
+                                <ValidationMessage For="@(() => editSkill.Name)" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Level</label>
+                                <InputText class="form-control" @bind-Value="editSkill.Level" />
+                                <ValidationMessage For="@(() => editSkill.Level)" />
+                            </div>
+                            <button type="submit" class="btn btn-primary d-inline-flex align-items-center gap-2 me-2" disabled="@isSaving">
+                                <AppIcon Name="check" Size="16" />
+                                Save
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary d-inline-flex align-items-center gap-2" @onclick="CancelEdit" disabled="@isSaving">
+                                <AppIcon Name="close" Size="16" />
+                                Cancel
+                            </button>
+                        </EditForm>
+                    }
+                    else
+                    {
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="skill-name">@skill.Name</span>
+                                <span class="badge rounded-pill bg-secondary">@skill.Level</span>
+                            </div>
+                            <div>
+                                <button type="button" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-2 me-2" @onclick="() => BeginEdit(skill)" disabled="@isSaving">
+                                    <AppIcon Name="edit" Size="15" />
+                                    Edit
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-2" @onclick="() => DeleteSkill(skill)" disabled="@isSaving">
+                                    <AppIcon Name="trash" Size="15" />
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
 </section>
 
 @code {
-    private readonly string[] Skills = ["C#", "Blazor", "ASP.NET Core", "SQLite"];
+    private List<Skill> skills = [];
+    private SkillForm newSkill = new();
+    private SkillForm editSkill = new();
+    private int? editingSkillId;
+    private int editingPortfolioUserId;
+    private string? errorMessage;
+    private bool isLoading = true;
+    private bool isSaving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSkills();
+    }
+
+    private async Task AddSkill()
+    {
+        await SaveChange(async () =>
+        {
+            await SkillService.AddSkillAsync(new Skill
+            {
+                Name = newSkill.Name,
+                Level = newSkill.Level,
+                PortfolioUserId = 1
+            });
+            newSkill = new();
+        }, "add the skill");
+    }
+
+    private void BeginEdit(Skill skill)
+    {
+        editingSkillId = skill.Id;
+        editingPortfolioUserId = skill.PortfolioUserId;
+        editSkill = new SkillForm
+        {
+            Name = skill.Name,
+            Level = skill.Level
+        };
+        errorMessage = null;
+    }
+
+    private async Task SaveEdit()
+    {
+        if (editingSkillId is not int skillId)
+        {
+            return;
+        }
+
+        await SaveChange(async () =>
+        {
+            await SkillService.UpdateSkillAsync(new Skill
+            {
+                Id = skillId,
+                Name = editSkill.Name,
+                Level = editSkill.Level,
+                PortfolioUserId = editingPortfolioUserId
+            });
+            editingSkillId = null;
+        }, "update the skill");
+    }
+
+    private void CancelEdit()
+    {
+        editingSkillId = null;
+        errorMessage = null;
+    }
+
+    private async Task DeleteSkill(Skill skill)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", $"Delete the skill '{skill.Name}'?"))
+        {
+            return;
+        }
+
+        await SaveChange(async () =>
+        {
+            await SkillService.DeleteSkillAsync(skill.Id);
+            if (editingSkillId == skill.Id)
+            {
+                editingSkillId = null;
+            }
+        }, "delete the skill");
+    }
+
+    private async Task LoadSkills()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            skills = await SkillService.GetSkillsAsync();
+        }
+        catch (HttpRequestException exception)
+        {
+            errorMessage = GetRequestError("load skills", exception);
+        }
+        catch (OperationCanceledException)
+        {
+            errorMessage = "Loading skills timed out. Please try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveChange(Func<Task> save, string action)
+    {
+        errorMessage = null;
+        isSaving = true;
+
+        try
+        {
+            await save();
+            try
+            {
+                skills = await SkillService.GetSkillsAsync();
+            }
+            catch (HttpRequestException exception)
+            {
+                errorMessage = $"The skill was changed, but {GetRequestError("refresh the list", exception)}";
+            }
+            catch (OperationCanceledException)
+            {
+                errorMessage = "The skill was changed, but refreshing the list timed out.";
+            }
+        }
+        catch (HttpRequestException exception)
+        {
+            errorMessage = GetRequestError(action, exception);
+        }
+        catch (OperationCanceledException)
+        {
+            errorMessage = $"Could not {action}; the request timed out.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private static string GetRequestError(string action, HttpRequestException exception)
+    {
+        return exception.StatusCode is { } statusCode
+            ? $"Could not {action}. The API returned {(int)statusCode} ({statusCode})."
+            : $"Could not {action}. Check the API connection and try again.";
+    }
+
+    private sealed class SkillForm
+    {
+        [Required]
+        public string Name { get; set; } = string.Empty;
+
+        [Required]
+        public string Level { get; set; } = string.Empty;
+    }
 }

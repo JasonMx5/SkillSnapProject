@@ -1,0 +1,43 @@
+@page "/skills"
+@using SkillSnap.Client.Components
+@using SkillSnap.Client.Services
+@inject AuthService AuthService
+@inject UserSessionService UserSessionService
+
+<PageTitle>Skills</PageTitle>
+
+<header class="page-heading">
+    <span class="page-heading-icon"><AppIcon Name="skills" Size="24" /></span>
+    <div>
+        <span class="eyebrow">Admin workspace</span>
+        <h1>Skill management</h1>
+        <p>Maintain the skills that help describe each portfolio and project.</p>
+    </div>
+</header>
+
+@if (!isInitialized)
+{
+    <div class="loading-panel"><span class="loading-dot"></span> Loading skills management...</div>
+}
+else if (UserSessionService.Role != "Admin")
+{
+    <div class="empty-state">
+        <span class="feature-icon"><AppIcon Name="user" Size="22" /></span>
+        <h2>Admin access required</h2>
+        <p>An Admin account is required to manage skills.</p>
+    </div>
+}
+else
+{
+    <SkillTags />
+}
+
+@code {
+    private bool isInitialized;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await AuthService.InitializeAsync();
+        isInitialized = true;
+    }
+}

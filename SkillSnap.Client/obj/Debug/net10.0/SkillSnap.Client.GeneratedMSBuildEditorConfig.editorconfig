@@ -33,8 +33,16 @@ build_property.EnableCodeStyleSeverity =
 build_metadata.AdditionalFiles.TargetPath = QXBwLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/jason/Documents/GitHub/SkillSnapProject/SkillSnap.Client/Components/AppIcon.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xBcHBJY29uLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/jason/Documents/GitHub/SkillSnapProject/SkillSnap.Client/Components/ProfileCard.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQcm9maWxlQ2FyZC5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/jason/Documents/GitHub/SkillSnapProject/SkillSnap.Client/Components/ProjectApplicationForm.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQcm9qZWN0QXBwbGljYXRpb25Gb3JtLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/jason/Documents/GitHub/SkillSnapProject/SkillSnap.Client/Components/ProjectList.razor]
@@ -45,20 +53,40 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xTa2lsbFRhZ3MucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/jason/Documents/GitHub/SkillSnapProject/SkillSnap.Client/Pages/Counter.razor]
-build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQ291bnRlci5yYXpvcg==
-build_metadata.AdditionalFiles.CssScope = 
-
 [C:/Users/jason/Documents/GitHub/SkillSnapProject/SkillSnap.Client/Pages/Home.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcSG9tZS5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/jason/Documents/GitHub/SkillSnapProject/SkillSnap.Client/Pages/Login.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcTG9naW4ucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/jason/Documents/GitHub/SkillSnapProject/SkillSnap.Client/Pages/MyEnrollments.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcTXlFbnJvbGxtZW50cy5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/jason/Documents/GitHub/SkillSnapProject/SkillSnap.Client/Pages/NotFound.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcTm90Rm91bmQucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/jason/Documents/GitHub/SkillSnapProject/SkillSnap.Client/Pages/Weather.razor]
-build_metadata.AdditionalFiles.TargetPath = UGFnZXNcV2VhdGhlci5yYXpvcg==
+[C:/Users/jason/Documents/GitHub/SkillSnapProject/SkillSnap.Client/Pages/ProjectDetails.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcUHJvamVjdERldGFpbHMucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/jason/Documents/GitHub/SkillSnapProject/SkillSnap.Client/Pages/ProjectListing.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcUHJvamVjdExpc3RpbmcucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/jason/Documents/GitHub/SkillSnapProject/SkillSnap.Client/Pages/Projects.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcUHJvamVjdHMucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/jason/Documents/GitHub/SkillSnapProject/SkillSnap.Client/Pages/Register.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcUmVnaXN0ZXIucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/jason/Documents/GitHub/SkillSnapProject/SkillSnap.Client/Pages/Skills.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcU2tpbGxzLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/jason/Documents/GitHub/SkillSnapProject/SkillSnap.Client/_Imports.razor]

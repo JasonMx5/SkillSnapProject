@@ -1,39 +1,120 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">SkillSnap.Client</a>
-        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-    </div>
-</div>
+﻿@using SkillSnap.Client.Services
+@inject AuthService AuthService
+@inject UserSessionService UserSessionService
+@inject NavigationManager Navigation
+@implements IDisposable
 
-<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
-            </NavLink>
-        </div>
-    </nav>
-</div>
+<header class="app-header">
+    <div class="app-header-inner">
+        <NavLink class="brand-link" href="" Match="NavLinkMatch.All" @onclick="CloseNavMenu">
+            <span class="brand-mark"><AppIcon Name="skills" Size="22" /></span>
+            <span class="brand-copy">
+                <strong>SkillSnap</strong>
+                <small>Portfolio workspace</small>
+            </span>
+        </NavLink>
+
+        <button type="button"
+                class="nav-menu-toggle"
+                aria-label="Toggle navigation"
+                aria-expanded="@(!collapseNavMenu)"
+                @onclick="ToggleNavMenu">
+            <AppIcon Name="@(collapseNavMenu ? "menu" : "close")" Size="21" />
+        </button>
+
+        <nav class="app-navigation @(collapseNavMenu ? "is-collapsed" : "is-expanded")"
+             aria-label="Primary navigation">
+            <div class="app-nav-tabs">
+                <NavLink class="app-nav-link" href="" Match="NavLinkMatch.All" @onclick="CloseNavMenu">
+                    <AppIcon Name="home" Size="18" />
+                    <span>Home</span>
+                </NavLink>
+                <NavLink class="app-nav-link" href="project-listing" @onclick="CloseNavMenu">
+                    <AppIcon Name="compass" Size="18" />
+                    <span>Explore</span>
+                </NavLink>
+                @if (AuthService.IsAuthenticated)
+                {
+                    <NavLink class="app-nav-link" href="my-enrollments" @onclick="CloseNavMenu">
+                        <AppIcon Name="bell" Size="18" />
+                        <span>My activity</span>
+                    </NavLink>
+                }
+                @if (AuthService.IsAuthenticated && UserSessionService.Role == "Admin")
+                {
+                    <NavLink class="app-nav-link" href="projects" @onclick="CloseNavMenu">
+                        <AppIcon Name="folder" Size="18" />
+                        <span>Projects</span>
+                    </NavLink>
+                    <NavLink class="app-nav-link" href="skills" @onclick="CloseNavMenu">
+                        <AppIcon Name="skills" Size="18" />
+                        <span>Skills</span>
+                    </NavLink>
+                }
+            </div>
+
+            <div class="app-nav-account">
+                @if (AuthService.IsAuthenticated)
+                {
+                    <div class="account-chip">
+                        <span class="account-avatar"><AppIcon Name="user" Size="17" /></span>
+                        <span class="account-copy">
+                            <strong>@AuthService.Email</strong>
+                            <small>@(UserSessionService.Role ?? "User")</small>
+                        </span>
+                    </div>
+                    <button type="button" class="account-action" @onclick="Logout">
+                        <AppIcon Name="logout" Size="17" />
+                        <span>Log out</span>
+                    </button>
+                }
+                else
+                {
+                    <NavLink class="account-action sign-in-action" href="login" @onclick="CloseNavMenu">
+                        <AppIcon Name="login" Size="17" />
+                        <span>Log in</span>
+                    </NavLink>
+                    <NavLink class="account-register" href="register" @onclick="CloseNavMenu">Create account</NavLink>
+                }
+            </div>
+        </nav>
+    </div>
+</header>
 
 @code {
     private bool collapseNavMenu = true;
 
-    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+    protected override async Task OnInitializedAsync()
+    {
+        AuthService.AuthenticationStateChanged += HandleAuthenticationStateChanged;
+        UserSessionService.StateChanged += HandleAuthenticationStateChanged;
+        await AuthService.InitializeAsync();
+    }
 
     private void ToggleNavMenu()
     {
         collapseNavMenu = !collapseNavMenu;
+    }
+
+    private void CloseNavMenu()
+    {
+        collapseNavMenu = true;
+    }
+
+    private async Task Logout()
+    {
+        await AuthService.LogoutAsync();
+        Navigation.NavigateTo("/login");
+    }
+
+    private void HandleAuthenticationStateChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        AuthService.AuthenticationStateChanged -= HandleAuthenticationStateChanged;
+        UserSessionService.StateChanged -= HandleAuthenticationStateChanged;
     }
 }

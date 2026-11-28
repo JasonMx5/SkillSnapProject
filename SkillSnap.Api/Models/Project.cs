@@ -17,5 +17,5 @@ public class Project
     public int PortfolioUserId { get; set; }
 
     [ForeignKey(nameof(PortfolioUserId))]
-    public PortfolioUser PortfolioUser { get; set; } = null!;
+    public PortfolioUser? PortfolioUser { get; set; }
 }

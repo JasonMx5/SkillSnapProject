@@ -1,0 +1,93 @@
+@page "/login"
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.JSInterop
+@using SkillSnap.Client.Services
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Log in</PageTitle>
+
+<div class="auth-layout">
+    <div class="auth-intro">
+        <span class="eyebrow">Welcome back</span>
+        <h1>Your next chapter starts here.</h1>
+        <p>Sign in to pick up where you left off and keep your projects moving forward.</p>
+    </div>
+
+    <EditForm Model="@model" OnValidSubmit="HandleLogin" class="card auth-card">
+        <span class="feature-icon"><AppIcon Name="login" Size="21" /></span>
+        <h2>Sign in to SkillSnap</h2>
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        @if (errorMessage is not null)
+        {
+            <div class="alert alert-danger" role="alert">@errorMessage</div>
+        }
+
+        <div class="mb-3">
+            <label for="login-email" class="form-label">Email</label>
+            <InputText id="login-email" type="email" class="form-control" autocomplete="username" @bind-Value="model.Email" />
+            <ValidationMessage For="@(() => model.Email)" />
+        </div>
+        <div class="mb-4">
+            <label for="login-password" class="form-label">Password</label>
+            <InputText id="login-password" type="password" class="form-control" autocomplete="current-password" @bind-Value="model.Password" />
+            <ValidationMessage For="@(() => model.Password)" />
+        </div>
+        <button type="submit" class="btn btn-primary d-inline-flex align-items-center justify-content-center gap-2 w-100" disabled="@isSubmitting">
+            @(isSubmitting ? "Signing in..." : "Sign in")
+            @if (!isSubmitting)
+            {
+                <AppIcon Name="arrow" Size="17" />
+            }
+        </button>
+        <p class="text-center small mb-0 mt-3">
+            New to SkillSnap? <a href="register">Create an account</a>
+        </p>
+    </EditForm>
+</div>
+
+@code {
+    private readonly LoginModel model = new();
+    private string? errorMessage;
+    private bool isSubmitting;
+
+    private async Task HandleLogin()
+    {
+        errorMessage = null;
+        isSubmitting = true;
+
+        try
+        {
+            await AuthService.LoginAsync(model.Email, model.Password);
+            Navigation.NavigateTo("/");
+        }
+        catch (HttpRequestException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        catch (InvalidOperationException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        catch (JSException)
+        {
+            errorMessage = "The login succeeded, but the browser couldn't store the session.";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private sealed class LoginModel
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        public string Password { get; set; } = string.Empty;
+    }
+}

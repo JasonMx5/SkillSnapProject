@@ -1,0 +1,101 @@
+@page "/register"
+@using System.ComponentModel.DataAnnotations
+@using SkillSnap.Client.Services
+@inject AuthService AuthService
+
+<PageTitle>Register</PageTitle>
+
+<div class="auth-layout">
+    <div class="auth-intro">
+        <span class="eyebrow">Create your space</span>
+        <h1>Make your next move count.</h1>
+        <p>Join a community of builders, learn through real projects, and make your progress visible.</p>
+    </div>
+
+    <EditForm Model="@model" OnValidSubmit="HandleRegister" class="card auth-card">
+        <span class="feature-icon"><AppIcon Name="user" Size="21" /></span>
+        <h2>Create your account</h2>
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        @if (errorMessage is not null)
+        {
+            <div class="alert alert-danger" role="alert">@errorMessage</div>
+        }
+        @if (registrationSucceeded)
+        {
+            <div class="alert alert-success" role="status">
+                Account created. You can now <a href="login">log in</a>.
+            </div>
+        }
+
+        <div class="mb-3">
+            <label for="register-email" class="form-label">Email</label>
+            <InputText id="register-email" type="email" class="form-control" autocomplete="email" @bind-Value="model.Email" />
+            <ValidationMessage For="@(() => model.Email)" />
+        </div>
+        <div class="mb-3">
+            <label for="register-password" class="form-label">Password</label>
+            <InputText id="register-password" type="password" class="form-control" autocomplete="new-password" @bind-Value="model.Password" />
+            <ValidationMessage For="@(() => model.Password)" />
+        </div>
+        <div class="mb-4">
+            <label for="register-confirm-password" class="form-label">Confirm password</label>
+            <InputText id="register-confirm-password" type="password" class="form-control" autocomplete="new-password" @bind-Value="model.ConfirmPassword" />
+            <ValidationMessage For="@(() => model.ConfirmPassword)" />
+        </div>
+        <button type="submit" class="btn btn-primary d-inline-flex align-items-center justify-content-center gap-2 w-100" disabled="@isSubmitting">
+            @(isSubmitting ? "Creating account..." : "Create account")
+            @if (!isSubmitting)
+            {
+                <AppIcon Name="arrow" Size="17" />
+            }
+        </button>
+        <p class="text-center small mb-0 mt-3">
+            Already registered? <a href="login">Sign in</a>
+        </p>
+    </EditForm>
+</div>
+
+@code {
+    private readonly RegisterModel model = new();
+    private string? errorMessage;
+    private bool registrationSucceeded;
+    private bool isSubmitting;
+
+    private async Task HandleRegister()
+    {
+        errorMessage = null;
+        registrationSucceeded = false;
+        isSubmitting = true;
+
+        try
+        {
+            await AuthService.RegisterAsync(model.Email, model.Password);
+            registrationSucceeded = true;
+        }
+        catch (HttpRequestException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private sealed class RegisterModel
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        [MinLength(8)]
+        public string Password { get; set; } = string.Empty;
+
+        [Required]
+        [Compare(nameof(Password), ErrorMessage = "Passwords do not match.")]
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
+}

@@ -1,0 +1,559 @@
+@page "/my-enrollments"
+@using SkillSnap.Client.Services
+@using SkillSnap.Shared.Models
+@inject AuthService AuthService
+@inject NotificationService NotificationService
+@inject ProjectService ProjectService
+@inject UserSessionService UserSessionService
+@implements IDisposable
+
+<PageTitle>My Enrollments</PageTitle>
+
+<header class="page-heading">
+    <span class="page-heading-icon"><AppIcon Name="bell" Size="24" /></span>
+    <div>
+        <span class="eyebrow">Your workspace</span>
+        <h1>My activity</h1>
+        <p>Keep track of your projects, requests, and updates.</p>
+    </div>
+</header>
+
+@if (noticeMessage is not null)
+{
+    <div class="alert alert-warning" role="status">@noticeMessage</div>
+}
+
+@if (!AuthService.IsAuthenticated)
+{
+    <p><a href="login">Log in</a> to see your enrollments.</p>
+}
+else
+{
+    <div class="page-tabs" role="group" aria-label="My activity sections">
+        <button type="button"
+                aria-pressed="@(activeTab == "projects")"
+                class="@GetTabClass("projects")"
+                @onclick="ShowProjects">
+            <AppIcon Name="folder" Size="18" />
+            My projects
+        </button>
+        <button type="button"
+                aria-pressed="@(activeTab == "notifications")"
+                class="@GetTabClass("notifications")"
+                @onclick="ShowNotifications">
+            <AppIcon Name="bell" Size="18" />
+            Notifications
+            @if (unreadNotificationCount > 0)
+            {
+                <span class="notification-count">@unreadNotificationCount</span>
+            }
+        </button>
+    </div>
+
+    @if (activeTab == "notifications")
+    {
+        <section aria-label="Notifications">
+            @if (notificationError is not null)
+            {
+                <div class="alert alert-danger" role="alert">@notificationError</div>
+            }
+            @if (isLoadingNotifications)
+            {
+                <div class="loading-panel"><span class="loading-dot"></span> Loading notifications...</div>
+            }
+            else if (notifications.Count == 0)
+            {
+                <div class="empty-state">
+                    <span class="feature-icon"><AppIcon Name="bell" Size="22" /></span>
+                    <h2>No notifications yet</h2>
+                    <p>Updates about your project enrollments will appear here.</p>
+                </div>
+            }
+            else
+            {
+                <div class="list-group notification-list">
+                    @foreach (var notification in notifications)
+                    {
+                        <article class="list-group-item notification-item @(notification.ReadAtUtc is null ? "is-unread" : string.Empty)">
+                            <span class="notification-icon"><AppIcon Name="bell" Size="19" /></span>
+                            <div class="notification-content">
+                                <p class="mb-1">@notification.Message</p>
+                                <small class="text-muted">@notification.CreatedAtUtc.ToLocalTime().ToString("g")</small>
+                                <a class="d-block mt-2" href="@($"projects/{notification.ProjectId}")">View project</a>
+                            </div>
+                            @if (notification.ReadAtUtc is null)
+                            {
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-2"
+                                        @onclick="() => MarkNotificationRead(notification)"
+                                        disabled="@(markingReadNotificationId is not null)">
+                                    <AppIcon Name="check" Size="16" />
+                                    @(markingReadNotificationId == notification.Id ? "Saving..." : "Mark read")
+                                </button>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-light">Read</span>
+                            }
+                        </article>
+                    }
+                </div>
+            }
+        </section>
+    }
+    else
+    {
+        <section aria-label="My projects">
+            @if (errorMessage is not null)
+            {
+                <div class="alert alert-danger" role="alert">@errorMessage</div>
+            }
+            @if (isLoading)
+            {
+                <div class="loading-panel"><span class="loading-dot"></span> Loading your projects...</div>
+            }
+            else if (enrollments.Count == 0)
+            {
+                <div class="empty-state">
+                    <span class="feature-icon"><AppIcon Name="folder" Size="22" /></span>
+                    <h2>Your project space is ready</h2>
+                    <p>Enroll in a project to see your progress here.</p>
+                    <a class="btn btn-primary" href="project-listing">Explore projects</a>
+                </div>
+            }
+            else
+            {
+                <div class="row g-4">
+                    @foreach (var enrollment in enrollments)
+                    {
+                        <div class="col-md-6 col-lg-4">
+                            <article class="card project-card h-100">
+                                @if (ProjectService.GetImageSource(enrollment.Project.ImageUrl) is { } imageSource)
+                                {
+                                    <img src="@imageSource" class="card-img-top project-card-image" alt="@enrollment.Project.Title" />
+                                }
+                                <div class="card-body d-flex flex-column p-4">
+                                    <h2 class="h5 card-title">@enrollment.Project.Title</h2>
+                                    <p class="card-text flex-grow-1">@enrollment.Project.Description</p>
+                                    <p>
+                                        <span class="badge @GetStatusClass(enrollment.Enrollment.Status)">
+                                            @GetStatusLabel(enrollment.Enrollment.Status)
+                                        </span>
+                                    </p>
+                                    <p class="project-meta">Enrolled on @enrollment.Enrollment.EnrolledAtUtc.ToString("d")</p>
+                                    <div class="mt-auto d-flex flex-wrap gap-2">
+                                        <a class="btn btn-outline-primary" href="@($"projects/{enrollment.Project.Id}")">
+                                            View details
+                                        </a>
+                                        <button type="button"
+                                                class="btn btn-outline-danger d-inline-flex align-items-center gap-2"
+                                                @onclick="() => Unenroll(enrollment.Project.Id)"
+                                                disabled="@(isUnenrollingProjectId is not null)">
+                                            <AppIcon Name="close" Size="16" />
+                                            @(isUnenrollingProjectId == enrollment.Project.Id ? "Unenrolling..." : "Unenroll")
+                                        </button>
+                                    </div>
+                                </div>
+                            </article>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+    }
+}
+
+@code {
+    private List<EnrollmentView> enrollments = [];
+    private List<NotificationResponse> notifications = [];
+    private string? errorMessage;
+    private string? notificationError;
+    private string? noticeMessage;
+    private int? isUnenrollingProjectId;
+    private int? markingReadNotificationId;
+    private bool isLoading = true;
+    private bool isLoadingNotifications = true;
+    private string? loadedUserId;
+    private int accountLoadVersion;
+    private string activeTab = "projects";
+    private int unreadNotificationCount => notifications.Count(notification => notification.ReadAtUtc is null);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await AuthService.InitializeAsync();
+        loadedUserId = UserSessionService.UserId;
+        AuthService.AuthenticationStateChanged += HandleIdentityChanged;
+        UserSessionService.StateChanged += HandleIdentityChanged;
+        await LoadCurrentAccountData();
+    }
+
+    private void HandleIdentityChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await RefreshForCurrentAccount();
+            StateHasChanged();
+        });
+    }
+
+    private async Task RefreshForCurrentAccount()
+    {
+        var currentUserId = UserSessionService.UserId;
+        if (currentUserId == loadedUserId)
+        {
+            return;
+        }
+
+        loadedUserId = currentUserId;
+        await LoadCurrentAccountData();
+    }
+
+    private async Task LoadCurrentAccountData()
+    {
+        var loadVersion = ++accountLoadVersion;
+        enrollments.Clear();
+        notifications.Clear();
+        errorMessage = null;
+        notificationError = null;
+        noticeMessage = null;
+        isUnenrollingProjectId = null;
+        markingReadNotificationId = null;
+
+        var userId = UserSessionService.UserId;
+        if (!AuthService.IsAuthenticated || string.IsNullOrWhiteSpace(userId))
+        {
+            isLoading = false;
+            isLoadingNotifications = false;
+            return;
+        }
+
+        isLoading = true;
+        isLoadingNotifications = true;
+        await Task.WhenAll(
+            LoadEnrollments(userId, loadVersion),
+            LoadNotifications(userId, loadVersion));
+    }
+
+    private async Task LoadEnrollments(string userId, int loadVersion)
+    {
+        try
+        {
+            var userEnrollments = await ProjectService.GetMyEnrollmentsAsync();
+            if (!IsCurrentAccountLoad(userId, loadVersion))
+            {
+                return;
+            }
+
+            var projects = await ProjectService.GetProjectsAsync();
+            if (!IsCurrentAccountLoad(userId, loadVersion))
+            {
+                return;
+            }
+
+            var projectsById = projects.ToDictionary(project => project.Id);
+
+            enrollments = userEnrollments
+                .Where(enrollment => projectsById.ContainsKey(enrollment.ProjectId))
+                .Select(enrollment => new EnrollmentView(
+                    projectsById[enrollment.ProjectId],
+                    enrollment))
+                .ToList();
+        }
+        catch (HttpRequestException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            if (!IsCurrentAccountLoad(userId, loadVersion))
+            {
+                return;
+            }
+
+            await AuthService.LogoutAsync();
+            noticeMessage = "Your session is no longer valid. Log in again to view your enrollments.";
+        }
+        catch (HttpRequestException exception)
+        {
+            if (!IsCurrentAccountLoad(userId, loadVersion))
+            {
+                return;
+            }
+
+            errorMessage = GetRequestError("load your enrollments", exception);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            if (!IsCurrentAccountLoad(userId, loadVersion))
+            {
+                return;
+            }
+
+            errorMessage = "The API returned invalid enrollment data.";
+        }
+        catch (InvalidOperationException)
+        {
+            if (!IsCurrentAccountLoad(userId, loadVersion))
+            {
+                return;
+            }
+
+            errorMessage = "The API returned an empty enrollment response.";
+        }
+        catch (OperationCanceledException)
+        {
+            if (!IsCurrentAccountLoad(userId, loadVersion))
+            {
+                return;
+            }
+
+            errorMessage = "Loading your enrollments timed out. Please try again.";
+        }
+        finally
+        {
+            if (IsCurrentAccountLoad(userId, loadVersion))
+            {
+                isLoading = false;
+            }
+        }
+    }
+
+    private async Task LoadNotifications(string userId, int loadVersion)
+    {
+        try
+        {
+            var userNotifications = await NotificationService.GetMyNotificationsAsync();
+            if (!IsCurrentAccountLoad(userId, loadVersion))
+            {
+                return;
+            }
+
+            notifications = userNotifications;
+        }
+        catch (HttpRequestException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            if (!IsCurrentAccountLoad(userId, loadVersion))
+            {
+                return;
+            }
+
+            await AuthService.LogoutAsync();
+            noticeMessage = "Your session is no longer valid. Log in again to view notifications.";
+        }
+        catch (HttpRequestException exception)
+        {
+            if (!IsCurrentAccountLoad(userId, loadVersion))
+            {
+                return;
+            }
+
+            notificationError = GetRequestError("load notifications", exception);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            if (!IsCurrentAccountLoad(userId, loadVersion))
+            {
+                return;
+            }
+
+            notificationError = "The API returned invalid notification data.";
+        }
+        catch (InvalidOperationException)
+        {
+            if (!IsCurrentAccountLoad(userId, loadVersion))
+            {
+                return;
+            }
+
+            notificationError = "The API returned an empty notifications response.";
+        }
+        catch (OperationCanceledException)
+        {
+            if (!IsCurrentAccountLoad(userId, loadVersion))
+            {
+                return;
+            }
+
+            notificationError = "Loading notifications timed out. Please try again.";
+        }
+        finally
+        {
+            if (IsCurrentAccountLoad(userId, loadVersion))
+            {
+                isLoadingNotifications = false;
+            }
+        }
+    }
+
+    private bool IsCurrentAccountLoad(string userId, int loadVersion)
+    {
+        return loadVersion == accountLoadVersion
+            && AuthService.IsAuthenticated
+            && UserSessionService.UserId == userId;
+    }
+
+    private string GetTabClass(string tab)
+    {
+        return activeTab == tab ? "page-tab active" : "page-tab";
+    }
+
+    private void ShowProjects()
+    {
+        activeTab = "projects";
+    }
+
+    private void ShowNotifications()
+    {
+        activeTab = "notifications";
+    }
+
+    private async Task MarkNotificationRead(NotificationResponse notification)
+    {
+        var userId = UserSessionService.UserId;
+        var loadVersion = accountLoadVersion;
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return;
+        }
+
+        notificationError = null;
+        markingReadNotificationId = notification.Id;
+
+        try
+        {
+            await NotificationService.MarkAsReadAsync(notification.Id);
+            if (!IsCurrentAccountLoad(userId, loadVersion))
+            {
+                return;
+            }
+
+            var index = notifications.FindIndex(item => item.Id == notification.Id);
+            if (index >= 0)
+            {
+                notifications[index] = notification with { ReadAtUtc = DateTime.UtcNow };
+            }
+        }
+        catch (HttpRequestException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            if (!IsCurrentAccountLoad(userId, loadVersion))
+            {
+                return;
+            }
+
+            await AuthService.LogoutAsync();
+            noticeMessage = "Your session is no longer valid. Log in again to update notifications.";
+        }
+        catch (HttpRequestException exception)
+        {
+            if (!IsCurrentAccountLoad(userId, loadVersion))
+            {
+                return;
+            }
+
+            notificationError = GetRequestError("mark the notification as read", exception);
+        }
+        catch (OperationCanceledException)
+        {
+            if (!IsCurrentAccountLoad(userId, loadVersion))
+            {
+                return;
+            }
+
+            notificationError = "Updating the notification timed out. Please try again.";
+        }
+        finally
+        {
+            if (IsCurrentAccountLoad(userId, loadVersion))
+            {
+                markingReadNotificationId = null;
+            }
+        }
+    }
+
+    private async Task Unenroll(int projectId)
+    {
+        var userId = UserSessionService.UserId;
+        var loadVersion = accountLoadVersion;
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return;
+        }
+
+        errorMessage = null;
+        isUnenrollingProjectId = projectId;
+
+        try
+        {
+            await ProjectService.UnenrollFromProjectAsync(projectId);
+            if (!IsCurrentAccountLoad(userId, loadVersion))
+            {
+                return;
+            }
+
+            enrollments.RemoveAll(enrollment => enrollment.Project.Id == projectId);
+        }
+        catch (HttpRequestException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            if (!IsCurrentAccountLoad(userId, loadVersion))
+            {
+                return;
+            }
+
+            await AuthService.LogoutAsync();
+            noticeMessage = "Your session is no longer valid. Log in again to manage your enrollments.";
+        }
+        catch (HttpRequestException exception)
+        {
+            if (!IsCurrentAccountLoad(userId, loadVersion))
+            {
+                return;
+            }
+
+            errorMessage = GetRequestError("unenroll from this project", exception);
+        }
+        catch (OperationCanceledException)
+        {
+            if (!IsCurrentAccountLoad(userId, loadVersion))
+            {
+                return;
+            }
+
+            errorMessage = "Unenrollment timed out. Please try again.";
+        }
+        finally
+        {
+            if (IsCurrentAccountLoad(userId, loadVersion))
+            {
+                isUnenrollingProjectId = null;
+            }
+        }
+    }
+
+    private static string GetStatusLabel(ProjectEnrollmentStatus status)
+    {
+        return status == ProjectEnrollmentStatus.Pending ? "Pending approval" : status.ToString();
+    }
+
+    private static string GetStatusClass(ProjectEnrollmentStatus status)
+    {
+        return status switch
+        {
+            ProjectEnrollmentStatus.Pending => "bg-warning text-dark",
+            ProjectEnrollmentStatus.Active => "bg-success",
+            ProjectEnrollmentStatus.Completed => "bg-secondary",
+            _ => "bg-secondary"
+        };
+    }
+
+    private static string GetRequestError(string action, HttpRequestException exception)
+    {
+        return exception.StatusCode is { } statusCode
+            ? $"Could not {action}. The API returned {(int)statusCode} ({statusCode})."
+            : $"Could not {action}. Check the API connection and try again.";
+    }
+
+    public void Dispose()
+    {
+        AuthService.AuthenticationStateChanged -= HandleIdentityChanged;
+        UserSessionService.StateChanged -= HandleIdentityChanged;
+        accountLoadVersion++;
+    }
+
+    private sealed record EnrollmentView(Project Project, ProjectEnrollmentSummary Enrollment);
+}
